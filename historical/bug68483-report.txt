@@ -1,0 +1,39 @@
+options used: -S -O2 -ftree-vectorize -msse2
+GCC 5.2 generates the following code:
+...
+	movdqa	%xmm0, %xmm1
+	movl	8(%esp), %ebx
+	psrldq	$8, %xmm1
+	paddd	%xmm1, %xmm0
+	movdqa	%xmm0, %xmm3
+	pshufd	$255, %xmm0, %xmm2
+	addl	%ebx, %eax
+	cmpl	%ebx, %esi
+	pshufd	$85, %xmm0, %xmm1
+	punpckhdq	%xmm0, %xmm3
+	movd	%xmm2, %ecx
+	punpckldq	%xmm3, %xmm1
+	movd	%ecx, %xmm2
+	punpcklqdq	%xmm2, %xmm1
+	paddd	%xmm1, %xmm0
+	movd	%xmm0, %ecx
+...
+
+while GCC 4.9.2 generates this:
+...
+	movdqa	%xmm0, %xmm1
+	movl	8(%esp), %ebx
+	psrldq	$8, %xmm1
+	paddd	%xmm1, %xmm0
+	movdqa	%xmm0, %xmm1
+	addl	%ebx, %eax
+	cmpl	%ebx, %esi
+	psrldq	$4, %xmm1
+	paddd	%xmm1, %xmm0
+	movd	%xmm0, %ecx
+...
+
+GCC 4.9.2: 1 psrldq instruction
+GCC 5.2.0: 2 pshufd, 2 movd, 2 punpckldq, 1 punpcklqdq instructions.
+
+Also, GCC 5.2.0 can generate the same code as GCC 4.9.2, but it requires -mssse3 option for this. It's strange that -mssse3 is necessary to generate more efficient SSE2 code.

@@ -1,0 +1,58 @@
+For T being an arithmetic type, gcc 4.1 generates what looks like suboptimal assembly code for inline C++ functions that take their argument(s) by const reference (const T&) vs the same functions that take their argument(s) by value (T).
+
+        .file   "t.cpp"
+        .section        ".text"
+        .align 4
+        .global _Z12test_min_refii
+        .type   _Z12test_min_refii, #function
+        .proc   04
+_Z12test_min_refii:
+.LLFB5:
+        cmp     %o0, %o1
+        st      %o0, [%sp+68]
+        st      %o1, [%sp+72]
+        bge     .LL7
+         add    %sp, 68, %o0
+        jmp     %o7+8
+         ld     [%o0], %o0
+.LL7:
+        add     %sp, 72, %o0
+        jmp     %o7+8
+         ld     [%o0], %o0
+.LLFE5:
+        .size   _Z12test_min_refii, .-_Z12test_min_refii
+        .global __gxx_personality_v0
+        .align 4
+        .global _Z12test_min_ptrii
+        .type   _Z12test_min_ptrii, #function
+        .proc   04
+_Z12test_min_ptrii:
+.LLFB6:
+        cmp     %o0, %o1
+        st      %o0, [%sp+68]
+        st      %o1, [%sp+72]
+        bge     .LL13
+         add    %sp, 68, %o0
+        jmp     %o7+8
+         ld     [%o0], %o0
+.LL13:
+        add     %sp, 72, %o0
+        jmp     %o7+8
+         ld     [%o0], %o0
+.LLFE6:
+        .size   _Z12test_min_ptrii, .-_Z12test_min_ptrii
+        .align 4
+        .global _Z12test_min_valii
+        .type   _Z12test_min_valii, #function
+        .proc   04
+_Z12test_min_valii:
+.LLFB7:
+        cmp     %o0, %o1
+        bg,a    .LL17
+         mov    %o1, %o0
+.LL17:
+        jmp     %o7+8
+         nop
+.LLFE7:
+        .size   _Z12test_min_valii, .-_Z12test_min_valii
+        .ident  "GCC: (GNU) 4.1.0"

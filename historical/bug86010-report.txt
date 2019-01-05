@@ -1,0 +1,31 @@
+gcc 7/8 regression:
+
+g:
+	.cfi_startproc
+	subq	$24, %rsp
+	.cfi_def_cfa_offset 32
+	movq	$0, 8(%rsp)
+	leaq	8(%rsp), %rdi
+	call	f
+	addq	$24, %rsp
+	.cfi_def_cfa_offset 8
+	ret
+	.cfi_endproc
+
+h:
+	.cfi_startproc
+	subq	$24, %rsp
+	.cfi_def_cfa_offset 32
+	xorl	%eax, %eax
+	xorl	%edx, %edx
+	leaq	8(%rsp), %rdi
+	movw	%ax, 14(%rsp)
+	movl	$0, 8(%rsp)
+	movw	%dx, 12(%rsp)
+	call	f
+	addq	$24, %rsp
+	.cfi_def_cfa_offset 8
+	ret
+	.cfi_endproc
+
+Possibly fixed for gcc-9.

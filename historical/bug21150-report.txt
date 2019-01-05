@@ -1,0 +1,90 @@
+Note: fixed in 4.7.2 - for x86. gcc-avr 5.4.0 still has huge issues for example
+
+This is what 4.0.0 produces from the testcase:
+
+# gcc -O2 -fomit-frame-pointer -S helper.c
+# cat helper.s
+ [I removed non-essential stuff]
+a:
+        movl    v+8, %eax
+        shrl    $8, %eax
+        xorb    v, %al
+        xorb    v+18, %al
+        xorb    v+27, %al
+        xorb    v+36, %al
+        movl    v+40, %edx
+        movl    v+44, %ecx
+        movl    %ecx, %edx
+        xorl    %ecx, %ecx
+        shrl    $8, %edx
+        xorl    %edx, %eax
+        xorb    v+54, %al
+        xorb    v+63, %al
+        movzbl  %al, %eax
+        ret
+b:
+        movl    v+8, %eax
+        movl    v+12, %edx
+        shrdl   $8, %edx, %eax
+        shrl    $8, %edx
+        xorb    v, %al
+        movl    v+16, %edx
+        movl    v+20, %ecx
+        shrdl   $16, %ecx, %edx
+        shrl    $16, %ecx
+        xorl    %edx, %eax
+        movl    v+24, %edx
+        movl    v+28, %ecx
+        shrdl   $24, %ecx, %edx
+        shrl    $24, %ecx
+        xorl    %edx, %eax
+        xorb    v+36, %al
+        movl    v+40, %edx
+        movl    v+44, %ecx
+        movl    %ecx, %edx
+        xorl    %ecx, %ecx
+        shrl    $8, %edx
+        xorl    %edx, %eax
+        xorb    v+54, %al
+        xorb    v+63, %al
+        movzbl  %al, %eax
+        ret
+c:
+        movb    v+9, %al
+        xorb    v, %al
+        xorb    v+18, %al
+        xorb    v+27, %al
+        xorb    v+36, %al
+        xorb    v+45, %al
+        xorb    v+54, %al
+        xorb    v+63, %al
+        movzbl  %al, %eax
+        ret
+d:
+        movl    v+8, %eax
+        movl    v+12, %edx
+        shrdl   $8, %edx, %eax
+        shrl    $8, %edx
+        xorb    v, %al
+        movl    v+16, %edx
+        movl    v+20, %ecx
+        shrdl   $16, %ecx, %edx
+        shrl    $16, %ecx
+        xorl    %edx, %eax
+        movl    v+24, %edx
+        movl    v+28, %ecx
+        shrdl   $24, %ecx, %edx
+        shrl    $24, %ecx
+        xorl    %edx, %eax
+        xorb    v+36, %al
+        movl    v+40, %edx
+        movl    v+44, %ecx
+        movl    %ecx, %edx
+        xorl    %ecx, %ecx
+        shrl    $8, %edx
+        xorl    %edx, %eax
+        xorb    v+54, %al
+        xorb    v+63, %al
+        movzbl  %al, %eax
+        ret
+

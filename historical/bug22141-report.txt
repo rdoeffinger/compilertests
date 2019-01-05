@@ -1,0 +1,19 @@
+gcc-4.0.1 produces the following code: 
+ 80483b7:       c6 05 13 96 04 08 04    movb   $0x4,0x8049613 
+ 80483be:       c6 05 12 96 04 08 03    movb   $0x3,0x8049612 
+ 80483c5:       c6 05 11 96 04 08 02    movb   $0x2,0x8049611 
+ 80483cc:       c6 05 10 96 04 08 01    movb   $0x1,0x8049610 
+ 
+gcc-3.4.5 produces the following code: 
+ 8048391:       ba 01 02 03 04          mov    $0x4030201,%edx 
+ 8048396:       89 e5                   mov    %esp,%ebp 
+ 8048398:       83 ec 18                sub    $0x18,%esp 
+ 804839b:       83 e4 f0                and    $0xfffffff0,%esp 
+ 804839e:       83 ec 10                sub    $0x10,%esp 
+ 80483a1:       89 15 1c 96 04 08       mov    %edx,0x804961c 
+ 
+gcc-2.95.4 produces the following code: 
+ 
+ 80483f7:       c7 05 84 96 04 08 01    movl   $0x4030201,0x8049684 
+ 80483fe:       02 03 04 
+
