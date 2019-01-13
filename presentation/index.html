@@ -27,7 +27,7 @@
 				var link_highlight_theme = document.createElement( 'link' );
 				link_highlight_theme.rel = 'stylesheet';
 				link_highlight_theme.type = 'text/css';
-				link_highlight_theme.href = 'highlight-default.css';
+				link_highlight_theme.href = 'highlight-vs.css';
 				document.getElementsByTagName( 'head' )[0].appendChild( link_highlight_theme );
 			}
 
@@ -47,6 +47,7 @@
 				<p>January 2019</p>
 				<br />
 				<p>Reimar Döffinger</p>
+				<p><small><small><a href="?print-pdf">Print view</a> or <a href="?print-pdf&amp;showNotes=separate-page">print view with notes</a> (may need Chrome/Chromium)</small></small></p>
 				</section>
 
 				<section><h2>Introduction</h2>
@@ -59,7 +60,7 @@
 					<p>Not meant to blame compiler developers!</p>
 					<p>gcc: really good quality, not encountered a compiler bug in years!</p>
 					<p>Should be thankful for that</p>
-					<p>
+					<br />
 					<p>Compilers have improved a lot...</p>
 					<p>...yet nothing fundamentally changed</p>
 					<p>"Obviously stupid" code still common with any compiler</p>
@@ -69,8 +70,8 @@
 				</section>
 
 				<section>
-				<h2>Initialization</h2>
 				<section>
+				<h2>Initialization</h2>
 				<pre><code data-trim class="cpp">
 struct cleartest
 {
@@ -85,7 +86,9 @@ cleartest tmp[128];
 					This is a simplified case. new[] has similar issues and affects more than just startup.
 				</aside>
 				</section>
-				<section>gcc 8
+				<section>
+				<h2>Initialization</h2>
+				<p>gcc 8</p>
 				<pre><code data-trim class="x86asm">
         .text
         .section        .text.startup,"ax",@progbits
@@ -104,7 +107,9 @@ tmp:
 
 				</code></pre>
 				</section>
-				<section>clang 7
+				<section>
+				<h2>Initialization</h2>
+				<p>clang 7</p>
 				<pre><code data-trim class="x86asm">
         .bss
         .p2align        4
@@ -115,8 +120,8 @@ tmp:
 				</section>
 
 				<section>
-				<h2>Initialization (2)</h2>
 				<section>
+				<h2>Initialization (2)</h2>
 				<pre><code data-trim class="cpp">
 struct cleartest
 {
@@ -131,7 +136,9 @@ cleartest tmp[128];
 					This example avoids the padding.
 				</aside>
 				</section>
-				<section>gcc 8
+				<section>
+				<h2>Initialization (2)</h2>
+				<p>gcc 8</p>
 				<pre><code data-trim class="x86asm">
         leaq    tmp(%rip), %rax
         pxor    %xmm0, %xmm0
@@ -148,8 +155,8 @@ cleartest tmp[128];
 				</section>
 
 				<section>
-				<h2>Initialization (3)</h2>
 				<section>
+				<h2>Initialization (3)</h2>
 				<pre><code data-trim class="cpp">
 struct cleartest
 {
@@ -167,7 +174,9 @@ cleartest tmp[128];
 					Not all 0s, so just dumping it in .bss without initialization code as clang did before cannot work.
 				</aside>
 				</section>
-				<section>gcc 8
+				<section>
+				<h2>Initialization (3)</h2>
+				<p>gcc 8</p>
 				<pre><code data-trim class="x86asm">
         leaq    tmp(%rip), %rax
         leaq    1536(%rax), %rdx
@@ -187,7 +196,9 @@ cleartest tmp[128];
 					Also none of the writes merged, no loop unrolling etc.
 				</aside>
 				</section>
-				<section>clang 7
+				<section>
+				<h2>Initialization (3)</h2>
+				<p>clang 7</p>
 				<pre><code data-trim class="x86asm">
         movl    $tmp, %eax
         movl    $tmp+1536, %ecx
@@ -209,8 +220,8 @@ cleartest tmp[128];
 				</section>
 
 				<section>
-				<h2>Assignment</h2>
 				<section>
+				<h2>Assignment</h2>
 				<pre><code data-trim class="cpp">
 struct test { int a, b, c, d; ... };
 std::array&lt;test, 500&gt; alarge, blarge;
@@ -222,7 +233,9 @@ void assigntiny() { atiny = btiny; }
 				</code></pre>
 				<p>Will array size affect the generated code? struct is 56 bytes large.</p>
 				</section>
-				<section>clang 7, large size
+				<section>
+				<h2>Assignment</h2>
+				<p>clang 7, large size</p>
 				<pre><code data-trim class="x86asm">
 _Z11assignlargev:
         movl    $alarge, %edi
@@ -240,7 +253,9 @@ _Z9assignmedv:
 					Allows to benefit from memcpy being resolved to the optimal function for the current CPU, and future libc updates might even use newer instruction that do not yet exist!
 				</aside>
 				</section>
-				<section>clang 7, small size
+				<section>
+				<h2>Assignment</h2>
+				<p>clang 7, small size</p>
 				<pre><code data-trim class="x86asm">
 _Z10assigntinyv:
         movq    btiny+48(%rip), %rax
@@ -255,7 +270,9 @@ _Z10assigntinyv:
 				</code></pre>
 				<p>Inlined memcpy, but is it optimal?</p>
 				</section>
-				<section>gcc 8, small size
+				<section>
+				<h2>Assignment</h2>
+				<p>gcc 8, small size</p>
 				<pre><code data-trim class="x86asm">
 _Z10assigntinyv:
         movdqa  btiny(%rip), %xmm0
@@ -273,7 +290,9 @@ _Z10assigntinyv:
 				Clang for some reason does not align atiny/btiny sufficiently to be able to use aligned movs.
 				</aside>
 				</section>
-				<section>gcc 8, large size
+				<section>
+				<h2>Assignment</h2>
+				<p>gcc 8, large size</p>
 				<pre><code data-trim class="x86asm">
 _Z11assignlargev:
         subq    $8, %rsp
@@ -299,8 +318,8 @@ _Z9assignmedv:
 
 
 				<section>
-				<h2>Signed Arithmetic</h2>
 				<section>
+				<h2>Signed Arithmetic</h2>
 				<pre><code data-trim class="cpp">
 unsigned long long t(int i) {
   return 2*(long long)(2*i);
@@ -320,7 +339,9 @@ short t3(short *a, int i) {
 				These do almost the same thing. But note signed overflow is undefined, unsigned is not.
 				</aside>
 				</section>
-				<section>gcc 8
+				<section>
+				<h2>Signed Arithmetic</h2>
+				<p>gcc 8</p>
 				<pre><code data-trim class="x86asm">
 _Z1ti:  movslq  %edi, %rax
         salq    $2, %rax
@@ -341,7 +362,9 @@ _Z2t3Psi:
 				However for array indexing gcc suddenly forgets it can merge the multiplications.
 				</aside>
 				</section>
-				<section>clang 7
+				<section>
+				<h2>Signed Arithmetic</h2>
+				<p>clang 7</p>
 				<pre><code data-trim class="x86asm">
 _Z1ti:  addl    %edi, %edi
         movslq  %edi, %rax
@@ -364,8 +387,8 @@ _Z2t3Psi:
 				</section>
 
 				<section>
-				<h2>Multiplication</h2>
 				<section>
+				<h2>Multiplication</h2>
 				<pre><code data-trim class="cpp">
 unsigned short mul(unsigned short x, unsigned char t)
 {
@@ -380,7 +403,9 @@ unsigned long mullarge(unsigned char x, unsigned char t)
 				<p>Not much could go wrong here, right?</p>
 				<p>So let's also look at other architectures</p>
 				</section>
-				<section>avr-gcc 5.4.0
+				<section>
+				<h2>Multiplication</h2>
+				<p>avr-gcc 5.4.0</p>
 				<pre><code data-trim class="x86asm">
 _Z3multh: movw r18,r24
         mul r22,r18
@@ -402,7 +427,9 @@ _Z8mullargehh:
 				This is actually much improved over what it used to be. There is a reason why assembler is still quite important for 8-bit microcontrollers.
 				</aside>
 				</section>
-				<section>clang-7
+				<section>
+				<h2>Multiplication</h2>
+				<p>clang-7</p>
 				<pre><code data-trim class="x86asm">
 _Z3multh:
         imull   %esi, %edi
@@ -419,7 +446,9 @@ _Z8mullargehh:
 				I could imagine some issues around partial register stalls, but it doesn't feel convincing... Or does the ABI not define the high 32 bit of the register?? But that would only be an issue with imulq, imull would do here!
 				</aside>
 				</section>
-				<section>gcc 8
+				<section>
+				<h2>Multiplication</h2>
+				<p>gcc 8</p>
 				<pre><code data-trim class="x86asm">
 _Z3multh:
         movzbl  %sil, %eax
@@ -433,7 +462,9 @@ _Z8mullargehh:
 				</code></pre>
 				<p>Essentially matches clang</p>
 				</section>
-				<section>gcc 8, AArch64
+				<section>
+				<h2>Multiplication</h2>
+				<p>gcc 8, AArch64</p>
 				<pre><code data-trim class="armasm">
 _Z3multh:
         and     w1, w1, 255
@@ -451,7 +482,9 @@ _Z8mullargehh:
 				Could ABI be to blame and the high bits really need to be masked? Let's see and compare with clang...
 				</aside>
 				</section>
-				<section>clang 7, AArch64
+				<section>
+				<h2>Multiplication</h2>
+				<p>clang 7, AArch64</p>
 				<pre><code data-trim class="armasm">
 _Z3multh:
         and     w8, w1, #0xff
