@@ -13,7 +13,24 @@
 		<link rel="stylesheet" href="lib/css/zenburn.css">
 
 		<!-- Printing and PDF exports -->
+		<!-- Append e.g. ?print-pdf&showNotes=separate-page to URL -->
 		<script>
+			// Switch to light theme for PDF/printing
+			if (window.location.search.match( /print-pdf/gi ))
+			{
+				var link_theme = document.createElement( 'link' );
+				link_theme.rel = 'stylesheet';
+				link_theme.type = 'text/css';
+				link_theme.href = 'css/theme/white.css';
+				document.getElementsByTagName( 'head' )[0].appendChild( link_theme );
+
+				var link_highlight_theme = document.createElement( 'link' );
+				link_highlight_theme.rel = 'stylesheet';
+				link_highlight_theme.type = 'text/css';
+				link_highlight_theme.href = 'highlight-default.css';
+				document.getElementsByTagName( 'head' )[0].appendChild( link_highlight_theme );
+			}
+
 			var link = document.createElement( 'link' );
 			link.rel = 'stylesheet';
 			link.type = 'text/css';
