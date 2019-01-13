@@ -1,0 +1,210 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>reveal.js</title>
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/black.css">
+
+		<!-- Theme used for syntax highlighting of code -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section><h2>Don't trust your compiler to optimize</h2>
+				<p>Reimar Döffinger</p>
+				<p>January 2019</p>
+				</section>
+
+				<section><h2>Introduction</h2>
+					<ul>
+					<li>Examples of badly performing generated code</li>
+					<li>Based on gcc - only because of familiarity</li>
+					<li>Compilers are great - but know their flaws</li>
+					</ul>
+				<aside class="notes">
+					<p>Not meant to blame compiler developers!</p>
+					<p>gcc: really good quality, not encountered a compiler bug in years!</p>
+					<p>Should be thankful for that</p>
+					<p>
+					<p>Compilers have improved a lot...</p>
+					<p>...yet nothing fundamentally changed</p>
+					<p>"Obviously stupid" code still common with any compiler</p>
+					<p>Because compilers are not human and do not know "obviously stupid"</p>
+					<p>Great at compiling huge projects without error - failing at not doing trivial things in horribly complex ways</p>
+				</aside>
+				</section>
+
+				<section>
+				<h2>Initialization</h2>
+				<section>
+				<pre><code data-trim class="cpp">
+struct cleartest
+{
+  cleartest() : a(0), b(0) {}
+  long long a;
+  int b;
+};
+cleartest tmp[128];
+				</code></pre>
+				<p>What do you expect compiler to produce?</p>
+				<aside class="notes">
+					This is a simplified case. new[] has similar issues and affects more than just startup.
+				</aside>
+				</section>
+				<section>gcc 8
+				<pre><code data-trim class="x86asm">
+        .text
+        .section        .text.startup,"ax",@progbits
+        leaq    tmp(%rip), %rax
+        leaq    2048(%rax), %rdx
+.L2:    movq    $0, (%rax)
+        addq    $16, %rax
+        movl    $0, -8(%rax)
+        cmpq    %rdx, %rax
+        jne     .L2
+        ret
+	.align 32
+        .bss
+tmp:
+        .zero   2048
+
+				</code></pre>
+				</section>
+				<section>clang 7
+				<pre><code data-trim class="x86asm">
+        .bss
+        .p2align        4
+tmp:
+        .zero   2048
+				</code></pre>
+				</section>
+				</section>
+
+				<section>
+				<h2>Initialization (2)</h2>
+				<section>
+				<pre><code data-trim class="cpp">
+struct cleartest
+{
+  cleartest() : a(0), b(0) {}
+  long long a;
+  long long b;
+};
+cleartest tmp[128];
+				</code></pre>
+				<p>And now?</p>
+				<aside class="notes">
+					This example avoids the padding.
+				</aside>
+				</section>
+				<section>gcc 8
+				<pre><code data-trim class="x86asm">
+        leaq    tmp(%rip), %rax
+        pxor    %xmm0, %xmm0
+        leaq    2048(%rax), %rdx
+.L2:
+        movaps  %xmm0, (%rax)
+        addq    $16, %rax
+        cmpq    %rax, %rdx
+        jne     .L2
+        ret
+				</code></pre>
+				<p>Well, at least some SSE is now used...</p>
+				</section>
+				</section>
+
+				<section>
+				<h2>Initialization (3)</h2>
+				<section>
+				<pre><code data-trim class="cpp">
+struct cleartest
+{
+  cleartest() : a(0), b(0), c(1), d(0) {}
+  int a;
+  int b;
+  short c;
+  short d;
+};
+
+cleartest tmp[128];
+				</code></pre>
+				<p>How will this one differ?</p>
+				<aside class="notes">
+					Not all 0s, so just dumping it in .bss without initialization code as clang did before cannot work.
+				</aside>
+				</section>
+				<section>gcc 8
+				<pre><code data-trim class="x86asm">
+        leaq    tmp(%rip), %rax
+        leaq    1536(%rax), %rdx
+.L2:    movl    $1, %ecx
+        xorl    %esi, %esi
+        addq    $12, %rax
+        movl    $0, -12(%rax)
+        movl    $0, -8(%rax)
+        movw    %cx, -4(%rax)
+        movw    %si, -2(%rax)
+        cmpq    %rdx, %rax
+        jne     .L2
+        ret
+				</code></pre>
+				<p>See the xorl in the loop and weep...</p>
+				<aside class="notes">
+					Also none of the writes merged, no loop unrolling etc.
+				</aside>
+				</section>
+				<section>clang 7
+				<pre><code data-trim class="x86asm">
+        movl    $tmp, %eax
+        movl    $tmp+1536, %ecx
+.LBB0_1: movq    $0, (%rax)
+        movl    $1, 8(%rax)
+        movq    $0, 12(%rax)
+        movl    $1, 20(%rax)
+        movq    $0, 24(%rax)
+        movl    $1, 32(%rax)
+        movq    $0, 36(%rax)
+        movl    $1, 44(%rax)
+        addq    $48, %rax
+        cmpq    %rcx, %rax
+        jne     .LBB0_1
+        retq
+				</code></pre>
+				<p>Better, but still no SSE, not in .data</p>
+				</section>
+				</section>
+			</div>
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.js"></script>
+
+		<script>
+			// More info about config & dependencies:
+			// - https://github.com/hakimel/reveal.js#configuration
+			// - https://github.com/hakimel/reveal.js#dependencies
+			Reveal.initialize({
+				dependencies: [
+					{ src: 'plugin/markdown/marked.js' },
+					{ src: 'plugin/markdown/markdown.js' },
+					{ src: 'plugin/notes/notes.js', async: true },
+					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+				]
+			});
+		</script>
+	</body>
+</html>

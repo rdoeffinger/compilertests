@@ -1,0 +1,4 @@
+Need reveal.js in reveal.js subdirectory.
+Can use git submodule to fetch it.
+Note: relies on symlinks, so might
+need manual fiddling to work on Windows.
