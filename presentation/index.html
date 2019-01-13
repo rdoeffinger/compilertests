@@ -187,6 +187,167 @@ cleartest tmp[128];
 				<p>Better, but still no SSE, not in .data</p>
 				</section>
 				</section>
+
+				<section>
+				<h2>Assignment</h2>
+				<section>
+				<pre><code data-trim class="cpp">
+struct test { int a, b, c, d; ... };
+std::array&lt;test, 500&gt; alarge, blarge;
+std::array&lt;test, 100&gt; amed, bmed;
+std::array&lt;test, 1&gt; atiny, btiny;
+void assignlarge() { alarge = blarge; }
+void assignmed() { amed = bmed; }
+void assigntiny() { atiny = btiny; }
+				</code></pre>
+				<p>Will array size affect the generated code? struct is 56 bytes large.</p>
+				</section>
+				<section>clang 7, large size
+				<pre><code data-trim class="x86asm">
+_Z11assignlargev:
+        movl    $alarge, %edi
+        movl    $blarge, %esi
+        movl    $28000, %edx            # imm = 0x6D60
+        jmp     memcpy                  # TAILCALL
+_Z9assignmedv:
+        movl    $amed, %edi
+        movl    $bmed, %esi
+        movl    $5600, %edx             # imm = 0x15E0
+        jmp     memcpy                  # TAILCALL
+				</code></pre>
+				<p>Simply uses memcpy, benefits from libc optimizations</p>
+				<aside class="notes">
+					Allows to benefit from memcpy being resolved to the optimal function for the current CPU, and future libc updates might even use newer instruction that do not yet exist!
+				</aside>
+				</section>
+				<section>clang 7, small size
+				<pre><code data-trim class="x86asm">
+_Z10assigntinyv:
+        movq    btiny+48(%rip), %rax
+        movq    %rax, atiny+48(%rip)
+        movups  btiny+32(%rip), %xmm0
+        movups  %xmm0, atiny+32(%rip)
+        movups  btiny+16(%rip), %xmm0
+        movups  %xmm0, atiny+16(%rip)
+        movups  btiny(%rip), %xmm0
+        movups  %xmm0, atiny(%rip)
+        retq
+				</code></pre>
+				<p>Inlined memcpy, but is it optimal?</p>
+				</section>
+				<section>gcc 8, small size
+				<pre><code data-trim class="x86asm">
+_Z10assigntinyv:
+        movdqa  btiny(%rip), %xmm0
+        movdqa  16+btiny(%rip), %xmm1
+        movdqa  32+btiny(%rip), %xmm2
+        movq    48+btiny(%rip), %rax
+        movaps  %xmm0, atiny(%rip)
+        movaps  %xmm1, 16+atiny(%rip)
+        movaps  %xmm2, 32+atiny(%rip)
+        movq    %rax, 48+atiny(%rip)
+        ret
+				</code></pre>
+				<p>Also nicely aligned! Different (better?) scheduling!</p>
+				<aside class="notes">
+				Clang for some reason does not align atiny/btiny sufficiently to be able to use aligned movs.
+				</aside>
+				</section>
+				<section>gcc 8, large size
+				<pre><code data-trim class="x86asm">
+_Z11assignlargev:
+        subq    $8, %rsp
+        movl    $28000, %edx
+        leaq    blarge(%rip), %rsi
+        leaq    alarge(%rip), %rdi
+        call    memcpy@PLT
+        addq    $8, %rsp
+        ret
+_Z9assignmedv:
+        leaq    amed(%rip), %rdi
+        leaq    bmed(%rip), %rsi
+        movl    $700, %ecx
+        rep movsq
+        ret
+				</code></pre>
+				<p>Ouch!</p>
+				<aside class="notes">
+				No tailcall optimization for memcpy, and 700 iterations of rep movsq surely can't be the right thing to do!!
+				</aside>
+				</section>
+				</section>
+
+
+				<section>
+				<h2>Signed Arithmetic</h2>
+				<section>
+				<pre><code data-trim class="cpp">
+unsigned long long t(int i) {
+  return 2*(long long)(2*i);
+}
+
+unsigned long long t2(int i) {
+  return 2*(unsigned long long)(2*i);
+}
+
+short t3(short *a, int i) {
+  return a[2*i];
+}
+				</code></pre>
+				<p>What is the difference between these?</p>
+				<p>How many instructions are needed?</p>
+				<aside class="notes">
+				These do almost the same thing. But note signed overflow is undefined, unsigned is not.
+				</aside>
+				</section>
+				<section>gcc 8
+				<pre><code data-trim class="x86asm">
+_Z1ti:  movslq  %edi, %rax
+        salq    $2, %rax
+        ret
+_Z2t2i: leal    (%rdi,%rdi), %eax
+        cltq
+        addq    %rax, %rax
+        ret
+_Z2t3Psi:
+        addl    %esi, %esi
+        movslq  %esi, %rsi
+        movzwl  (%rdi,%rsi,2), %eax
+        ret
+				</code></pre>
+				<aside class="notes">
+				Since signed overflow is undefined, both multiplications can be merged in the first case.
+				In the second case they must be done separately with extension to 64-bit in-between.
+				However for array indexing gcc suddenly forgets it can merge the multiplications.
+				</aside>
+				</section>
+				<section>clang 7
+				<pre><code data-trim class="x86asm">
+_Z1ti:  addl    %edi, %edi
+        movslq  %edi, %rax
+        addq    %rax, %rax
+        retq
+_Z2t2i: addl    %edi, %edi
+        movslq  %edi, %rax
+        addq    %rax, %rax
+        retq
+_Z2t3Psi:
+        addl    %esi, %esi
+        movslq  %esi, %rax
+        movzwl  (%rdi,%rax,2), %eax
+        retq
+				</code></pre>
+				<aside class="notes">
+				clang doesn't know about any such optimizations. Also a bit different instruction selection.
+				</aside>
+				</section>
+				</section>
+
+				<section>
+				<h1>Thanks!</h1>
+				<h2>Questions?</h2>
+				<p>More examples and slides: <a href="https://github.com/rdoeffinger/compilertests">https://github.com/rdoeffinger/compilertests</a></p>
+				</section>
 			</div>
 		</div>
 
