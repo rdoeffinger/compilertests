@@ -25,8 +25,11 @@
 		<div class="reveal">
 			<div class="slides">
 				<section><h2>Don't trust your compiler to optimize</h2>
-				<p>Reimar Döffinger</p>
+				<br />
+				<p>Malmö C++ User Group meeting
 				<p>January 2019</p>
+				<br />
+				<p>Reimar Döffinger</p>
 				</section>
 
 				<section><h2>Introduction</h2>
@@ -342,6 +345,111 @@ _Z2t3Psi:
 				</aside>
 				</section>
 				</section>
+
+				<section>
+				<h2>Multiplication</h2>
+				<section>
+				<pre><code data-trim class="cpp">
+unsigned short mul(unsigned short x, unsigned char t)
+{
+    return x * t;
+}
+
+unsigned long mullarge(unsigned char x, unsigned char t)
+{
+    return (unsigned long)x * t;
+}
+				</code></pre>
+				<p>Not much could go wrong here, right?</p>
+				<p>So let's also look at other architectures</p>
+				</section>
+				<section>avr-gcc 5.4.0
+				<pre><code data-trim class="x86asm">
+_Z3multh: movw r18,r24
+        mul r22,r18
+        movw r24,r0
+        mul r22,r19
+        add r25,r0
+        clr __zero_reg__
+        ret
+_Z8mullargehh:
+        mov r18,r24
+        ldi r19,0
+        mov r26,r22
+        ldi r27,0
+	call __umulhisi3 # 16x16->32 mult.
+        ret
+				</code></pre>
+				<aside class="notes">
+				Somehow it realizes that it doesn't need 32-bit inputs. It's almost as if the multiplication function is chosen on based on output sizes, not input sizes.
+				This is actually much improved over what it used to be. There is a reason why assembler is still quite important for 8-bit microcontrollers.
+				</aside>
+				</section>
+				<section>clang-7
+				<pre><code data-trim class="x86asm">
+_Z3multh:
+        imull   %esi, %edi
+        movl    %edi, %eax
+        retq
+_Z8mullargehh:
+        movl    %edi, %ecx
+        movl    %esi, %eax
+        imulq   %rcx, %rax
+        retq
+				</code></pre>
+				<p>Is there a good reason these are different at all??</p>
+				<aside class="notes">
+				I could imagine some issues around partial register stalls, but it doesn't feel convincing... Or does the ABI not define the high 32 bit of the register?? But that would only be an issue with imulq, imull would do here!
+				</aside>
+				</section>
+				<section>gcc 8
+				<pre><code data-trim class="x86asm">
+_Z3multh:
+        movzbl  %sil, %eax
+        imull   %edi, %eax
+        ret
+_Z8mullargehh:
+        movzbl  %dil, %eax
+        movzbl  %sil, %edi
+        imulq   %rdi, %rax
+        ret
+				</code></pre>
+				<p>Essentially matches clang</p>
+				</section>
+				<section>gcc 8, AArch64
+				<pre><code data-trim class="armasm">
+_Z3multh:
+        and     w1, w1, 255
+        and     w0, w0, 65535
+        mul     w0, w0, w1
+        ret
+_Z8mullargehh:
+        and     w1, w1, 255
+        and     w0, w0, 255
+        umull   x0, w0, w1
+        ret
+				</code></pre>
+				<p>Wait what?</p>
+				<aside class="notes">
+				Could ABI be to blame and the high bits really need to be masked? Let's see and compare with clang...
+				</aside>
+				</section>
+				<section>clang 7, AArch64
+				<pre><code data-trim class="armasm">
+_Z3multh:
+        and     w8, w1, #0xff
+        mul     w0, w8, w0
+        ret
+_Z8mullargehh:
+        and     x8, x0, #0xff
+        and     x9, x1, #0xff
+        mul     x0, x9, x8
+        ret
+				</code></pre>
+				<p>Ok... One masking less, but pointless 64 bit multiply?</p>
+				</section>
+				</section>
+
 
 				<section>
 				<h1>Thanks!</h1>
