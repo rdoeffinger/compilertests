@@ -94,9 +94,9 @@ cleartest tmp[128];
         .section        .text.startup,"ax",@progbits
         leaq    tmp(%rip), %rax
         leaq    2048(%rax), %rdx
-.L2:    movq    $0, (%rax)
+.L2:    movq    $0, (%rax)   # long long a
         addq    $16, %rax
-        movl    $0, -8(%rax)
+        movl    $0, -8(%rax) # int b
         cmpq    %rdx, %rax
         jne     .L2
         ret
@@ -144,7 +144,7 @@ cleartest tmp[128];
         pxor    %xmm0, %xmm0
         leaq    2048(%rax), %rdx
 .L2:
-        movaps  %xmm0, (%rax)
+        movaps  %xmm0, (%rax)  # long long a, b
         addq    $16, %rax
         cmpq    %rax, %rdx
         jne     .L2
@@ -183,10 +183,10 @@ cleartest tmp[128];
 .L2:    movl    $1, %ecx
         xorl    %esi, %esi
         addq    $12, %rax
-        movl    $0, -12(%rax)
-        movl    $0, -8(%rax)
-        movw    %cx, -4(%rax)
-        movw    %si, -2(%rax)
+        movl    $0, -12(%rax)  # int a
+        movl    $0, -8(%rax)   # int b
+        movw    %cx, -4(%rax)  # short c = 1
+        movw    %si, -2(%rax)  # short d
         cmpq    %rdx, %rax
         jne     .L2
         ret
@@ -202,10 +202,10 @@ cleartest tmp[128];
 				<pre><code data-trim class="x86asm">
         movl    $tmp, %eax
         movl    $tmp+1536, %ecx
-.LBB0_1: movq    $0, (%rax)
-        movl    $1, 8(%rax)
-        movq    $0, 12(%rax)
-        movl    $1, 20(%rax)
+.LBB0_1: movq    $0, (%rax)  # int a, b
+        movl    $1, 8(%rax)  # short c, d
+        movq    $0, 12(%rax) # int a, b
+        movl    $1, 20(%rax) # short c, d
         movq    $0, 24(%rax)
         movl    $1, 32(%rax)
         movq    $0, 36(%rax)
@@ -309,9 +309,9 @@ _Z9assignmedv:
         rep movsq
         ret
 				</code></pre>
-				<p>Ouch!</p>
+				<p>Looks a lot less nice...</p>
 				<aside class="notes">
-				No tailcall optimization for memcpy, and 700 iterations of rep movsq surely can't be the right thing to do!!
+				No tailcall optimization for memcpy, and 700 iterations of rep movsq depends on architecture if it works well! Well optimized on some architectures (but with large setup overhead).
 				</aside>
 				</section>
 				</section>
@@ -336,21 +336,21 @@ short t3(short *a, int i) {
 				<p>What is the difference between these?</p>
 				<p>How many instructions are needed?</p>
 				<aside class="notes">
-				These do almost the same thing. But note signed overflow is undefined, unsigned is not.
+				These do almost the same thing. Note signed overflow is undefined, unsigned is not. In all cases 2*i is signed though, but the cast seems to confuse compiler.
 				</aside>
 				</section>
 				<section>
 				<h2>Signed Arithmetic</h2>
 				<p>gcc 8</p>
 				<pre><code data-trim class="x86asm">
-_Z1ti:  movslq  %edi, %rax
+_Z1ti:  movslq  %edi, %rax          # 2*(s64)(2*i)
         salq    $2, %rax
         ret
-_Z2t2i: leal    (%rdi,%rdi), %eax
+_Z2t2i: leal    (%rdi,%rdi), %eax   # 2*(u64)(2*i)
         cltq
         addq    %rax, %rax
         ret
-_Z2t3Psi:
+_Z2t3Psi:                           # a[2*i]
         addl    %esi, %esi
         movslq  %esi, %rsi
         movzwl  (%rdi,%rsi,2), %eax
@@ -358,7 +358,7 @@ _Z2t3Psi:
 				</code></pre>
 				<aside class="notes">
 				Since signed overflow is undefined, both multiplications can be merged in the first case.
-				In the second case they must be done separately with extension to 64-bit in-between.
+				In the second case they are done separately with extension to 64-bit in-between as if it was a unsigned multiply...
 				However for array indexing gcc suddenly forgets it can merge the multiplications.
 				</aside>
 				</section>
@@ -407,14 +407,14 @@ unsigned long mullarge(unsigned char x, unsigned char t)
 				<h2>Multiplication</h2>
 				<p>avr-gcc 5.4.0</p>
 				<pre><code data-trim class="x86asm">
-_Z3multh: movw r18,r24
+_Z3multh: movw r18,r24    # u16 = u16 * u8
         mul r22,r18
         movw r24,r0
         mul r22,r19
         add r25,r0
         clr __zero_reg__
         ret
-_Z8mullargehh:
+_Z8mullargehh:            # u32 = (u8 cast to u32) * u8
         mov r18,r24
         ldi r19,0
         mov r26,r22
@@ -431,11 +431,11 @@ _Z8mullargehh:
 				<h2>Multiplication</h2>
 				<p>clang-7</p>
 				<pre><code data-trim class="x86asm">
-_Z3multh:
+_Z3multh: # u16 = u16 * u8
         imull   %esi, %edi
         movl    %edi, %eax
         retq
-_Z8mullargehh:
+_Z8mullargehh: # u32 = (u8 cast to u32) * u8
         movl    %edi, %ecx
         movl    %esi, %eax
         imulq   %rcx, %rax
@@ -450,11 +450,11 @@ _Z8mullargehh:
 				<h2>Multiplication</h2>
 				<p>gcc 8</p>
 				<pre><code data-trim class="x86asm">
-_Z3multh:
+_Z3multh: # u16 = u16 * u8
         movzbl  %sil, %eax
         imull   %edi, %eax
         ret
-_Z8mullargehh:
+_Z8mullargehh: # u32 = (u8 cast to u32) * u8
         movzbl  %dil, %eax
         movzbl  %sil, %edi
         imulq   %rdi, %rax
@@ -466,15 +466,15 @@ _Z8mullargehh:
 				<h2>Multiplication</h2>
 				<p>gcc 8, AArch64</p>
 				<pre><code data-trim class="armasm">
-_Z3multh:
+_Z3multh: # u16 = u16 * u8
         and     w1, w1, 255
         and     w0, w0, 65535
         mul     w0, w0, w1
         ret
-_Z8mullargehh:
+_Z8mullargehh: # u32 = (u8 cast to u32) * u8
         and     w1, w1, 255
         and     w0, w0, 255
-        umull   x0, w0, w1
+	umull   x0, w0, w1  # note: 32x32 -> 64 multiply
         ret
 				</code></pre>
 				<p>Wait what?</p>
@@ -486,17 +486,20 @@ _Z8mullargehh:
 				<h2>Multiplication</h2>
 				<p>clang 7, AArch64</p>
 				<pre><code data-trim class="armasm">
-_Z3multh:
+_Z3multh: # u16 = u16 * u8
         and     w8, w1, #0xff
         mul     w0, w8, w0
         ret
-_Z8mullargehh:
+_Z8mullargehh: # u32 = (u8 cast to u32) * u8
         and     x8, x0, #0xff
         and     x9, x1, #0xff
-        mul     x0, x9, x8
+	mul     x0, x9, x8  # 64x64 -> 64 multiply
         ret
 				</code></pre>
 				<p>Ok... One masking less, but pointless 64 bit multiply?</p>
+				<aside class="notes">
+				Conclusion: small types and casts seem to BADLY confuse compilers
+				</aside>
 				</section>
 				</section>
 
